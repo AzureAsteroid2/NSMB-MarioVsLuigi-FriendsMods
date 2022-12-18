@@ -41,6 +41,15 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Levels/CustomDesert.unity
     guid: 0a445e83695e8424e9e56da3e5b773e4
+  - enabled: 1
+    path: Assets/Scenes/Levels/CustomCrack.unity
+    guid: a86cb053125e77947b74b74180e7ada6
+  - enabled: 1
+    path: Assets/Scenes/Levels/CustomGalaxy.unity
+    guid: 55278a11c072628499a72e7158d2b68b
+  - enabled: 1
+    path: Assets/Scenes/Levels/CustomDonk.unity
+    guid: 0cd681d5c32923444a197fdec2be59dd
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 49335f30d253220488d2d332ade6e901,
       type: 2}

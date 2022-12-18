@@ -9,6 +9,7 @@ public class CameraController : MonoBehaviour {
 
     public static float ScreenShake = 0;
     public Vector3 currentPosition;
+    //public Enums.PowerupState state = Enums.PowerupState.Small, previousState;
     public bool IsControllingCamera { get; set; } = false;
 
     private Vector2 airThreshold = new(0.5f, 1.3f), groundedThreshold = new(0.5f, 0f);
@@ -25,13 +26,15 @@ public class CameraController : MonoBehaviour {
         controller = GetComponent<PlayerController>();
         targetCamera.GetComponentsInChildren(secondaryPositioners);
     }
-
+    
     public void LateUpdate() {
         currentPosition = CalculateNewPosition();
         if (IsControllingCamera) {
-
             Vector3 shakeOffset = Vector3.zero;
-            if ((ScreenShake -= Time.deltaTime) > 0 && controller.onGround)
+            if (controller.state == Enums.PowerupState.Crack)
+                ScreenShake = 1.2f;
+            if ((ScreenShake -= Time.deltaTime) > 0 && controller.onGround || controller.state == Enums.PowerupState.Crack)
+                
                 shakeOffset = new Vector3((Random.value - 0.5f) * ScreenShake, (Random.value - 0.5f) * ScreenShake);
 
             targetCamera.transform.position = currentPosition + shakeOffset;

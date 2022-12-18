@@ -29,6 +29,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
     public float slowriseGravity = 0.85f, normalGravity = 2.5f, flyingGravity = 0.8f, flyingTerminalVelocity = 1.25f, drillVelocity = 7f, groundpoundTime = 0.25f, groundpoundVelocity = 10, blinkingSpeed = 0.25f, terminalVelocity = -7f, jumpVelocity = 6.25f, megaJumpVelocity = 16f, launchVelocity = 12f, wallslideSpeed = -4.25f, giantStartTime = 1.5f, soundRange = 10f, slopeSlidingAngle = 12.5f, pickupTime = 0.5f;
     public float propellerLaunchVelocity = 6, propellerFallSpeed = 2, propellerSpinFallSpeed = 1.5f, propellerSpinTime = 0.75f, propellerDrillBuffer, heightSmallModel = 0.42f, heightLargeModel = 0.82f;
 
+
     BoxCollider2D[] hitboxes;
     GameObject models;
 
@@ -46,7 +47,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
     public float invincible, giantTimer, floorAngle, knockbackTimer, pipeTimer, slowdownTimer;
 
     //MOVEMENT STAGES
-    private static readonly int WALK_STAGE = 1, RUN_STAGE = 3, STAR_STAGE = 4;
+    private static readonly int WALK_STAGE = 1, RUN_STAGE = 3, STAR_STAGE = 4, CRACK_STAGE = 4;
     private static readonly float[] SPEED_STAGE_MAX = { 0.9375f, 2.8125f, 4.21875f, 5.625f, 8.4375f };
     private static readonly float SPEED_SLIDE_MAX = 7.5f;
     private static readonly float[] SPEED_STAGE_ACC = { 0.131835975f, 0.06591802875f, 0.05859375f, 0.0439453125f, 1.40625f };
@@ -477,7 +478,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
 
                 if (invincible > 0) {
                     //we are invincible. murder time :)
-                    if (other.state == Enums.PowerupState.MegaMushroom) {
+                    if (other.state == Enums.PowerupState.MegaMushroom || state == Enums.PowerupState.Crack && other.state != Enums.PowerupState.Crack) {
                         //wait fuck-
                         photonView.RPC(nameof(Knockback), RpcTarget.All, otherObj.transform.position.x > body.position.x, 1, true, otherView.ViewID);
                         return;
@@ -557,7 +558,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
                         } else {
                             photonView.RPC(nameof(PlaySound), RpcTarget.All, Enums.Sounds.Enemy_Generic_Stomp);
                         }
-                    } else if (other.state == Enums.PowerupState.MiniMushroom && groundpounded) {
+                    } else if (other.state == Enums.PowerupState.MiniMushroom && groundpounded || other.state == Enums.PowerupState.Crack && groundpounded) {
                         //we are big, groundpounding a mini opponent. squish.
                         otherView.RPC(nameof(Knockback), RpcTarget.All, otherObj.transform.position.x > body.position.x, 3, false, photonView.ViewID);
                         bounce = false;
@@ -643,7 +644,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
                 return;
             }
 
-            if (state == Enums.PowerupState.MiniMushroom) {
+            if (state == Enums.PowerupState.MiniMushroom || state == Enums.PowerupState.Crack) {
                 photonView.RPC(nameof(Powerdown), RpcTarget.All, false);
                 return;
             }
@@ -762,7 +763,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
     }
 
     private void ActivatePowerupAction() {
-        if (knockback || pipeEntering || GameManager.Instance.gameover || dead || Frozen || holding)
+        if (state == Enums.PowerupState.Crack ||knockback || pipeEntering || GameManager.Instance.gameover || dead || Frozen || holding)
             return;
 
         switch (state) {
@@ -1003,6 +1004,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
 
         switch (state) {
         case Enums.PowerupState.MiniMushroom:
+        case Enums.PowerupState.Crack:
         case Enums.PowerupState.Small: {
             if (photonView.IsMine)
                 photonView.RPC(nameof(Death), RpcTarget.All, false, false);
@@ -1561,7 +1563,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
         if (!GameManager.Instance.started || hitInvincibilityCounter > 0 || pipeEntering || Frozen || dead || giantStartTimer > 0 || giantEndTimer > 0)
             return;
 
-        if (state == Enums.PowerupState.MiniMushroom && starsToDrop > 1) {
+        if (state == Enums.PowerupState.MiniMushroom && starsToDrop > 1 || state == Enums.PowerupState.Crack) {
             SpawnStars(2, false);
             Powerdown(false);
             return;
@@ -2146,8 +2148,10 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
         int maxStage;
         if (invincible > 0 && run && onGround)
             maxStage = STAR_STAGE;
-        else if (run)
+        else if (run && state != Enums.PowerupState.Crack)
             maxStage = RUN_STAGE;
+        else if (state == Enums.PowerupState.Crack)
+            maxStage = CRACK_STAGE;
         else
             maxStage = WALK_STAGE;
 
@@ -2632,14 +2636,20 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
                 photonView.RPC(nameof(PlaySound), RpcTarget.All, Enums.Sounds.World_Block_Bump);
             }
         }
-
+        
         bool right = joystick.x > analogDeadzone && !paused;
         bool left = joystick.x < -analogDeadzone && !paused;
         bool crouch = joystick.y < -analogDeadzone && !paused;
         alreadyGroundpounded &= crouch;
         bool up = joystick.y > analogDeadzone && !paused;
         bool jump = jumpBuffer > 0 && (onGround || koyoteTime < 0.07f || wallSlideLeft || wallSlideRight) && !paused;
+        if (state == Enums.PowerupState.Crack)
+        {
+             //CameraController.ScreenShake = 0.25f;
+             right = joystick.x < analogDeadzone && !paused; ;
+             left = joystick.x > -analogDeadzone && !paused; ;
 
+        }
         if (drill) {
             propellerSpinTimer = 0;
             if (propeller) {
@@ -2989,7 +2999,7 @@ public class PlayerController : MonoBehaviourPun, IFreezableEntity, ICustomSeria
     }
 
     public bool CanPickup() {
-        return state != Enums.PowerupState.MiniMushroom && !skidding && !turnaround && !holding && running && !propeller && !flying && !crouching && !dead && !wallSlideLeft && !wallSlideRight && !doublejump && !triplejump && !groundpound;
+        return state != Enums.PowerupState.MiniMushroom && state != Enums.PowerupState.Crack && !skidding && !turnaround && !holding && running && !propeller && !flying && !crouching && !dead && !wallSlideLeft && !wallSlideRight && !doublejump && !triplejump && !groundpound;
     }
     void OnDrawGizmos() {
         if (!body)
